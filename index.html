@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="./assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="player">
+    <!-- Dashboard -->
+    <div class="dashboard">
+      <!-- Header -->
+      <header>
+        <h4>Now playing:</h4>
+        <h2>String 57th & 9th</h2>
+      </header>
+  
+      <!-- CD -->
+      <div class="cd">
+        <div class="cd-thumb" style="background-image: url('https://i.ytimg.com/vi/jTLhQf5KJSc/maxresdefault.jpg')">
+        </div>
+      </div>
+  
+      <!-- Control -->
+      <div class="control">
+        <div class="btn btn-repeat">
+          <i class="fas fa-redo"></i>
+        </div>
+        <div class="btn btn-prev">
+          <i class="fas fa-step-backward"></i>
+        </div>
+        <div class="btn btn-toggle-play">
+          <i class="fas fa-pause icon-pause"></i>
+          <i class="fas fa-play icon-play"></i>
+        </div>
+        <div class="btn btn-next">
+          <i class="fas fa-step-forward"></i>
+        </div>
+        <div class="btn btn-random">
+          <i class="fas fa-random"></i>
+        </div>
+      </div>
+  
+      <input id="progress" class="progress" type="range" value="0" step="1" min="0" max="100">
+  
+      <audio id="audio" src="">
+        
+      </audio>
+    </div>
+  
+    <!-- Playlist -->
+    <div class="playlist">
+  </div>
+  
+  <!-- Design from: https://static.collectui.com/shots/3671744/musicloud-revolutionary-app-for-music-streaming-large -->
+
+<script>
+/*
+  1.Render Songs
+  2.Scroll Top
+  3.Play / Pause/ Seek
+  4.CD rotate
+  5.Next / Prev
+  6.Random
+  7.Next / Repeat when ended
+  8.Active song
+  9.Scroll active song into view
+  10.Scroll Play song when click
+  11. Save config local storage
+*/
+
+  const PLAYER_STORAGE_KEY = "Player_t"
+  const $ = document.querySelector.bind(document)
+  const $$ = document.querySelectorAll.bind(document)
+
+  const playlistElement = $(".playlist")
+  const cdElement = $(".cd")
+  const audioElement = $("#audio")
+  const headNameSongElement = $("header h2")
+  const cdThumbnailElement = $(".cd-thumb")
+  const playBtnElement = $(".btn-toggle-play")
+  const playerElement = $(".player")
+  const progressElement = $(".progress")
+  const nextBtnElement = $(".btn-next")
+  const prevBtnElement = $(".btn-prev")
+  const randBtnElement = $(".btn-random")
+  const repeatBtnElement = $(".btn-repeat")
+
+  const app = {
+    isPlaying : false,
+    isRandom:false,
+    isRepeat:false,
+    currentIndex:0,
+    configs: JSON.parse(localStorage.getItem(PLAYER_STORAGE_KEY)) || {},
+    setConfigs : function(key,value){
+      this.configs[key] = value
+      localStorage.setItem(PLAYER_STORAGE_KEY,JSON.stringify(this.configs))
+    },
+    songs : [
+      {
+          name:"Anh Thanh Niên ",
+          singer:"HuyR",
+          path :"./assets/music/Anh Thanh Niên.mp3",
+          image : "./assets/images/anhthanhnien.jpg"
+      },
+      {
+          name:"Aloha",
+          singer:"Cool",
+          path :"./assets/music/Aloha - Cool.mp3",
+          image : "./assets/images/aloha.jpg"
+      },
+      {
+          name:"Anh Không Đòi Quà",
+          singer:"Karik",
+          path :"./assets/music/Anh Không Đòi Quà Remix.mp3",
+          image : "./assets/images/anhkhongdoiqua.jpg"
+      },
+      {
+          name:"Dragostea Din Tei",
+          singer:"O-zone",
+          path :"./assets/music/My za hi.mp3",
+          image : "./assets/images/Dragostea Din Tei.jpg"
+      },
+      {
+          name:"Wind Of Change",
+          singer:"Susan wong",
+          path :"./assets/music/Wind Of Change .mp3",
+          image : "./assets/images/windofchange.jpg"
+      },
+      {
+          name:"Hạ Còn Vương Nắng",
+          singer:"DatKaa",
+          path :"./assets/music/Hạ Còn Vương Nắng.mp3",
+          image : "./assets/images/haconvuongnang.jpg"
+      },
+      {
+          name:"Rồi Tới Luôn",
+          singer:"HuyR",
+          path :"./assets/music/Rồi Tới Luôn.mp3",
+          image : "./assets/images/roitoiluon.jpg"
+      },
+    ],
+    //Render list song
+    render: function() {
+          const songHTML = this.songs.map(function(song,index){
+              return `
+                  <div class="song ${index === app.currentIndex ? 'active' :''}" data-index="${index}">
+                    <div class="thumb" style="background-image: url('${song.image}')">
+                    </div>
+                    <div class="body">
+                      <h3 class="title">${song.name}</h3>
+                      <p class="author">${song.singer}</p>
+                    </div>
+                    <div class="option">
+                      <i class="fas fa-ellipsis-h"></i>
+                    </div>
+                  </div>`
+          })
+          playlistElement.innerHTML = songHTML.join('');
+    },
+    //All handle into here
+    handleEvents: function(){
+        const _this = this;
+        const cdWidth = cdElement.offsetWidth;
+
+        //handle xoay CD thumb
+        const cdAnimate = cdThumbnailElement.animate([
+          {transform: 'rotate(360deg)'}
+        ],{
+          duration: 10000,
+          iterations: Infinity,
+        })
+        cdAnimate.pause()
+
+        //handle thu nho  song image
+        document.onscroll = function(){
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const newCdWidth = cdWidth - scrollTop;
+          
+          cdElement.style.width = newCdWidth > 0 ? newCdWidth + 'px' : 0;
+        }
+        //handle khi an nut repeat
+        repeatBtnElement.onclick = function(){
+          _this.isRepeat = !_this.isRepeat;
+          this.classList.toggle('active',_this.isRepeat);
+          _this.setConfigs("isRepeat",_this.isRepeat);
+        }
+        //handle khi an nut random song
+        randBtnElement.onclick = function(){
+
+            _this.isRandom = !_this.isRandom;
+            this.classList.toggle('active',_this.isRandom);
+            _this.setConfigs("isRandom",_this.isRandom);
+        },
+        //handle an nut next song 
+        nextBtnElement.onclick = function(){
+            if(_this.isRandom){
+              _this.randomSong();
+            }
+            else{
+              _this.nextSong();
+            } 
+            audio.play();
+            _this.render();
+            _this.scrollToActiveSong();
+        
+        },
+        //handle khi an nut prev 
+        prevBtnElement.onclick = function(){
+
+            if(_this.isRandom){
+              _this.randomSong();
+            }
+            else{
+              _this.prevSong();
+            }
+            audio.play();
+            _this.render();
+        }
+        //handle click play song
+        playBtnElement.onclick = function(){
+
+            if(_this.isPlaying){
+              audio.pause()             
+            }else{   
+              audio.play();
+            }
+        }
+        // handle khi song playing
+        audio.onplay = function(){
+            _this.isPlaying = true;
+            playerElement.classList.add('playing')
+            cdAnimate.play()
+        }
+        // handle khi song pause
+        audio.onpause = function(){
+
+          _this.isPlaying = false;
+          playerElement.classList.remove('playing')
+          cdAnimate.pause()
+        }
+        let checkOnmouseAndTouch = true;
+        progressElement.onmousedown = function() {
+            checkOnmouseAndTouch = false;
+        }
+
+        progressElement.ontouchstart = function() {
+            checkOnmouseAndTouch = false;
+        }
+
+        //handle change tua song/ seek song
+        progressElement.onchange = function(e){
+          const currentSeek = e.target.value * audio.duration / 100;        
+          audio.currentTime  =  currentSeek
+          checkOnmouseAndTouch = true;
+
+        }
+        //handle song bi keo
+        // audio.onseeked = function(){
+        //   if(audio.duration && checkOnmouseAndTouch){
+        //     const progressPercent = Math.floor((audio.currentTime / audio.duration) * 100);
+        //     progressElement.value = progressPercent
+        //   }       
+        // }
+        //handle seek song (chay the time)
+        audio.ontimeupdate = function(){
+          if(audio.duration){
+            const progressPercent = Math.floor((audio.currentTime / audio.duration) * 100);
+            progressElement.value = progressPercent
+          }       
+        }
+        //handle khi ended song
+        audio.onended = function(){
+          if(_this.isRepeat){
+              audio.play();
+          }else{
+              nextBtnElement.click();
+          }
+        }
+        //handle khi an vao song khac trong playlist
+        playlistElement.onclick = function(e){
+          const songNode = e.target.closest('.song:not(.active)')
+          
+          if(songNode || e.target.closest('.option)')){
+            if(songNode){
+              _this.currentIndex = Number(songNode.dataset.index);
+              _this.loadCurrentSong();
+              audio.play();
+              _this.render();
+            }
+            //Xy ly khi click vao song option
+            if(e.target.closest(".option")){
+
+            }
+          }
+        }
+    },
+    scrollToActiveSong:function(){
+
+        setTimeout(function(){
+          $(".song.active").scrollIntoView({
+            behavior:"smooth",
+            block : "center"
+          })
+        },5000) //0.5 second
+    },
+    //handle random song
+    randomSong: function() {
+        let randIndex ;
+        
+        do {
+          randIndex = Math.floor(Math.random() * this.songs.length)
+        } while (randIndex == this.currentIndex);
+        this.currentIndex = randIndex;
+        this.loadCurrentSong();
+        console.log(this.currentIndex)
+    }, 
+    // handle next bai
+    nextSong : function(){
+      this.currentIndex++;
+      if(this.currentIndex >= this.songs.length){
+        this.currentIndex = 0;
+      }
+      this.loadCurrentSong();
+    },
+    //handle lui bai
+    prevSong : function(){
+      this.currentIndex--;
+
+      console.log(this.currentIndex)
+      if(this.currentIndex < 0){
+        this.currentIndex = this.songs.length - 1;
+      }
+      this.loadCurrentSong();
+    },
+    //Define property cua app
+    defineProperties: function(){
+        Object.defineProperty(this,'currentSong',{
+            get: function(){
+              return this.songs[this.currentIndex]
+            }
+        })
+    },
+    //load current song
+    loadCurrentSong: function(){
+        const songPlay = this.currentSong;
+
+        audio.src = songPlay.path
+        headNameSongElement.textContent = songPlay.name;
+        cdThumbnailElement.style.backgroundImage = `url('${songPlay.image}')`
+    
+      },
+      //load configs
+    loadConfig:function(){
+        this.isRepeat = this.configs.isRepeat;
+        this.isRandom = this.configs.isRandom;
+
+        console.log(this.configs)
+
+        randBtnElement.classList.toggle('active',this.isRandom);
+        repeatBtnElement.classList.toggle('active',this.isRepeat);
+        //Cach 2
+        //Object.assign(this,this.config);// tu dong assign config vao this
+
+    },
+    start : function(){
+        this.loadConfig();
+
+        this.defineProperties();
+
+        this.handleEvents();
+
+        this.loadCurrentSong();
+
+        this.render();
+    }
+  }
+
+  app.start();
+</script>
+</body>
+</html>
